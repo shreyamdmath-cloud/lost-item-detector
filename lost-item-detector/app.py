@@ -1,32 +1,4 @@
 # app.py
-"""
-LOST ITEM DETECTOR – HYBRID (YOLO + CLIP + ORB)
-
-=================================================
-Technologies Used:
-------------------
-1. Python       - Main programming language
-2. Streamlit    - User interface/web app
-3. OpenCV       - Video processing, frame extraction, ORB features
-4. YOLOv8       - Object detection on lost item & video frames
-5. ORB          - Fast feature matching for similarity scoring
-6. NumPy        - Mathematical operations
-7. GitHub       - Version control for project files
-
-=================================================
-Workflow of the System:
------------------------
-1. User uploads lost item image
-2. User uploads CCTV video
-3. Video is converted into sampled frames
-4. YOLO detects items in each frame
-5. ORB extracts features from the lost item
-6. ORB extracts features from detected objects in each frame
-7. ORB compares object features → calculates similarity score
-8. CLIP is also used as a fallback semantic feature extractor
-9. System selects top 3 matching frames
-10. Displays frames + timestamps + match scores
-"""
 
 import streamlit as st
 import os
