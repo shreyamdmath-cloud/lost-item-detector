@@ -1,42 +1,39 @@
+# utils/feature_extract.py
 import cv2
 import numpy as np
-from ultralytics import YOLO
+from sentence_transformers import SentenceTransformer
+from PIL import Image
 
-model = YOLO("model/yolov8n.pt")
+# load once (slow on first run while model downloads)
+_clip_model = SentenceTransformer("clip-ViT-B-32")  # light + accurate for matching
+
+def _to_pil(img_np):
+    """Convert BGR numpy image (OpenCV) to PIL image in RGB."""
+    if img_np is None:
+        return None
+    if isinstance(img_np, np.ndarray):
+        # OpenCV uses BGR; convert to RGB
+        if img_np.shape[2] == 3:
+            img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
+        else:
+            img_rgb = img_np
+        return Image.fromarray(img_rgb)
+    else:
+        # assume path-like
+        return Image.open(img_np).convert("RGB")
 
 def extract_features(input_data):
-
-    # CASE 1: input is a numpy image (frame from video)
-    if isinstance(input_data, np.ndarray):
-        img = input_data
-
-    # CASE 2: input is a file path
-    else:
-        img = cv2.imread(input_data)
-
-    if img is None:
+    """
+    Input:
+      - input_data: either a numpy ndarray (BGR) or a file path string
+    Output:
+      - normalized 512-d embedding (numpy float32 array)
+    """
+    pil = _to_pil(input_data)
+    if pil is None:
         return None
 
-    results = model.predict(img, verbose=False)
-
-    features = []
-    for r in results:
-        if r.boxes is None:
-            continue
-
-        for box in r.boxes.xyxy:
-            x1, y1, x2, y2 = map(int, box)
-            cropped = img[y1:y2, x1:x2]
-
-            try:
-                resized = cv2.resize(cropped, (128, 128))
-                feat = resized.flatten() / 255.0
-                features.append(feat)
-            except:
-                pass
-
-    if len(features) == 0:
-        resized = cv2.resize(img, (128, 128))
-        return resized.flatten() / 255.0
-
-    return np.mean(features, axis=0)
+    # sentence-transformers returns numpy vector
+    emb = _clip_model.encode(pil, convert_to_numpy=True, normalize_embeddings=True)
+    # ensure float32
+    return emb.astype(np.float32)
