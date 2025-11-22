@@ -1,4 +1,33 @@
 # app.py
+"""
+LOST ITEM DETECTOR – HYBRID (YOLO + CLIP + ORB)
+
+=================================================
+Technologies Used:
+------------------
+1. Python       - Main programming language
+2. Streamlit    - User interface/web app
+3. OpenCV       - Video processing, frame extraction, ORB features
+4. YOLOv8       - Object detection on lost item & video frames
+5. ORB          - Fast feature matching for similarity scoring
+6. NumPy        - Mathematical operations
+7. GitHub       - Version control for project files
+
+=================================================
+Workflow of the System:
+-----------------------
+1. User uploads lost item image
+2. User uploads CCTV video
+3. Video is converted into sampled frames
+4. YOLO detects items in each frame
+5. ORB extracts features from the lost item
+6. ORB extracts features from detected objects in each frame
+7. ORB compares object features → calculates similarity score
+8. CLIP is also used as a fallback semantic feature extractor
+9. System selects top 3 matching frames
+10. Displays frames + timestamps + match scores
+"""
+
 import streamlit as st
 import os
 import cv2
@@ -6,21 +35,20 @@ import numpy as np
 import datetime
 from ultralytics import YOLO
 from utils.feature_extract import extract_features
-from utils.similarity import cosine_similarity  # normalized embeddings = dot product
+from utils.similarity import cosine_similarity
 
-# ------------------ LOAD YOLO MODEL (strong model) ------------------
-yolo = YOLO("model/yolov8s.pt")     # better detection than nano
+# ------------------ LOAD MODELS ------------------
+yolo = YOLO("model/yolov8s.pt")
+orb = cv2.ORB_create(nfeatures=1500)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-st.title("🔍 Lost Item Detector – CLIP Embeddings + YOLO + Fallback Scan")
-st.write("Upload CCTV video and lost item image. System detects object class and performs CLIP-based matching with fallback scanning.")
+st.title("🔍 Lost Item Detector – YOLO + CLIP + ORB Hybrid System")
 
 # ------------------ STEP 1: UPLOAD CCTV VIDEO ------------------
 st.subheader("Step 1 — Upload CCTV Video")
-video_file = st.file_uploader("Upload CCTV video (MP4/MOV/AVI/MKV)", type=["mp4","mov","avi","mkv"])
-
+video_file = st.file_uploader("Upload CCTV video", type=["mp4", "mov", "avi", "mkv"])
 video_path = None
 if video_file:
     video_path = os.path.join(UPLOAD_FOLDER, "cctv_video.mp4")
@@ -28,168 +56,129 @@ if video_file:
         f.write(video_file.getbuffer())
     st.success("Video uploaded.")
 
-# ------------------ STEP 2: UPLOAD LOST ITEM ------------------
+# ------------------ STEP 2: UPLOAD LOST ITEM IMAGE ------------------
 st.subheader("Step 2 — Upload Lost Item Image")
-item_file = st.file_uploader("Upload lost item image (jpg/png/jpeg)", type=["jpg","png","jpeg"])
-
+item_file = st.file_uploader("Upload lost item image", type=["jpg", "png", "jpeg"])
 item_path = None
 if item_file:
     item_path = os.path.join(UPLOAD_FOLDER, "lost_item.jpg")
     with open(item_path, "wb") as f:
         f.write(item_file.getbuffer())
-    st.image(item_path, caption="Lost item (input)", width=300)
+    st.image(item_path, caption="Lost Item", width=300)
     st.success("Lost item uploaded.")
 
 # ------------------ STEP 3: PROCESS & MATCH ------------------
 if video_path and item_path:
-    st.subheader("Step 3 — Searching for matches (please wait)")
-    st.info("Detecting objects and scanning frames...")
 
-    # Detect object in lost item image
-    item_results = yolo.predict(item_path, imgsz=640, conf=0.05, iou=0.1, verbose=False)
-    boxes = item_results[0].boxes
+    st.subheader("Step 3 — Matching in progress…")
+    st.info("Extracting features & scanning frames...")
 
+    # Detect lost item using YOLO
+    lost_results = yolo.predict(item_path, imgsz=640, conf=0.20, verbose=False)
+    boxes = lost_results[0].boxes
     if boxes is None or len(boxes) == 0:
-        st.error("No object detected in the lost item image! Provide a clearer crop.")
+        st.error("No object detected in the lost item image!")
         st.stop()
 
-    # Pick largest detected box
+    # Choose largest detected object
     areas = [(int(b.xyxy[0][2] - b.xyxy[0][0]) * int(b.xyxy[0][3] - b.xyxy[0][1])) for b in boxes]
-    largest_idx = int(np.argmax(areas))
-    chosen_box = boxes[largest_idx]
+    chosen_box = boxes[int(np.argmax(areas))]
 
-    lost_class_id = int(chosen_box.cls[0])
-    lost_class_name = yolo.names[lost_class_id]
+    lx1, ly1, lx2, ly2 = map(int, chosen_box.xyxy[0])
+    lost_img = cv2.imread(item_path)
+    lost_crop = lost_img[ly1:ly2, lx1:lx2]
 
-    x1, y1, x2, y2 = map(int, chosen_box.xyxy[0])
-    img_bgr = cv2.imread(item_path)
-    lost_crop = img_bgr[y1:y2, x1:x2]
+    # ORB features for lost item
+    lost_gray = cv2.cvtColor(lost_crop, cv2.COLOR_BGR2GRAY)
+    kp1, des1 = orb.detectAndCompute(lost_gray, None)
+    if des1 is None:
+        st.error("ORB could not extract features from lost item.")
+        st.stop()
 
-    st.write(f"Detected lost item class: **{lost_class_name}**")
-
-    # CLIP embedding for lost item
+    # CLIP embedding (backup)
     lost_emb = extract_features(lost_crop)
 
-    # Process video
+    # ------------------ SCAN VIDEO ------------------
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 10.0
+    fps = cap.get(cv2.CAP_PROP_FPS) or 10
+    frame_interval = int(fps * 1)
 
-    SAMPLE_SEC = 0.5                     # more frames = higher accuracy
-    IMGSZ = 1280                          # high resolution YOLO input
-    CONF = 0.05                           # low conf for small objects
-    IOU = 0.1                             # loose NMS for small boxes
-
-    frame_interval = int(max(1, fps * SAMPLE_SEC))
     frame_idx = 0
-
     scores = []
-    frames_rgb = []
+    frames = []
     timestamps = []
+    bboxes = []
+
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 
     pbar = st.progress(0)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-    est_samples = total_frames // frame_interval if total_frames > 0 else None
-    processed = 0
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
+        best_bbox = None
+        best_score = 0
+
         if frame_idx % frame_interval == 0:
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            best_score_for_frame = 0.0
-            best_bbox = None
 
-            # ------------------ YOLO OBJECT MATCH ------------------
-            det = yolo.predict(frame, imgsz=IMGSZ, conf=CONF, iou=IOU, verbose=False)
+            # YOLO detect objects in the frame
+            det = yolo.predict(frame, imgsz=640, conf=0.20, verbose=False)
 
-            if det and det[0].boxes is not None:
+            if det and det[0].boxes:
                 for b in det[0].boxes:
-                    cls_id = int(b.cls[0])
-                    if cls_id != lost_class_id:
-                        continue
 
-                    bx1, by1, bx2, by2 = map(int, b.xyxy[0])
-                    if (bx2 - bx1) < 15 or (by2 - by1) < 15:
-                        continue
+                    x1, y1, x2, y2 = map(int, b.xyxy[0])
+                    obj = frame[y1:y2, x1:x2]
 
-                    crop = frame[by1:by2, bx1:bx2]
-                    crop_emb = extract_features(crop)
-                    score = float(np.dot(lost_emb, crop_emb))
+                    # ORB matching
+                    gray_obj = cv2.cvtColor(obj, cv2.COLOR_BGR2GRAY)
+                    kp2, des2 = orb.detectAndCompute(gray_obj, None)
 
-                    if score > best_score_for_frame:
-                        best_score_for_frame = score
-                        best_bbox = (bx1, by1, bx2, by2)
+                    if des2 is not None:
+                        matches = bf.match(des1, des2)
+                        good = [m for m in matches if m.distance < 40]
+                        score_orb = len(good)
 
-            # ------------------ FALLBACK TILE SCAN ------------------
-            if best_score_for_frame < 0.05:
-                H, W = frame.shape[:2]
-                GRID = 4
+                        if score_orb > best_score:
+                            best_score = score_orb
+                            best_bbox = (x1, y1, x2, y2)
 
-                tile_h = H // GRID
-                tile_w = W // GRID
+            # CLIP fallback
+            clip_emb = extract_features(frame)
+            if clip_emb is not None:
+                score_clip = float(np.dot(lost_emb, clip_emb)) * 100
+                if score_clip > best_score:
+                    best_score = int(score_clip)
 
-                for gy in range(GRID):
-                    for gx in range(GRID):
-                        tx1 = gx * tile_w
-                        ty1 = gy * tile_h
-                        tx2 = min(W, tx1 + tile_w)
-                        ty2 = min(H, ty1 + tile_h)
-
-                        if (tx2 - tx1) < 30 or (ty2 - ty1) < 30:
-                            continue
-
-                        tile = frame[ty1:ty2, tx1:tx2]
-                        tile_emb = extract_features(tile)
-                        score = float(np.dot(lost_emb, tile_emb))
-
-                        if score > best_score_for_frame:
-                            best_score_for_frame = score
-                            best_bbox = (tx1, ty1, tx2, ty2)
-
-            # Draw bounding box if found
-            if best_bbox:
-                x1b, y1b, x2b, y2b = best_bbox
-                cv2.rectangle(rgb, (x1b, y1b), (x2b, y2b), (255, 0, 0), 3)
-
-            # Store results
-            scores.append(best_score_for_frame)
-            frames_rgb.append(rgb)
+            frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             timestamps.append(frame_idx / fps)
-
-            processed += 1
-            if est_samples:
-                pbar.progress(min(100, int(processed / est_samples * 100)))
+            scores.append(best_score)
+            bboxes.append(best_bbox)
 
         frame_idx += 1
+        pbar.progress(min(100, int(frame_idx / total_frames * 100)))
 
     cap.release()
     pbar.empty()
 
     # ------------------ DISPLAY TOP MATCHES ------------------
-    if len(scores) == 0:
-        st.error("No frames processed.")
-        st.stop()
+    st.subheader("Top 3 Matches")
 
-    top_n = min(3, len(scores))
-    top_indices = np.argsort(scores)[::-1][:top_n]
+    top_idxs = np.argsort(scores)[::-1][:3]
 
-    THRESH = 0.20        # lower threshold for metal bottle detection
-    st.subheader("Top Matches")
+    for idx in top_idxs:
+        frame = frames[idx].copy()
+        bbox = bboxes[idx]
 
-    any_above = False
-    for idx in top_indices:
-        score = float(scores[idx])
-        timestamp = str(datetime.timedelta(seconds=int(timestamps[idx])))
-        caption = f"Score: {score:.3f} | Time: {timestamp}"
+        if bbox is not None:
+            x1, y1, x2, y2 = bbox
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 4)
 
-        if score >= THRESH:
-            any_above = True
-        else:
-            caption += " (low match)"
+        sec = int(timestamps[idx])
+        time_str = str(datetime.timedelta(seconds=sec))
+        caption = f"Score: {scores[idx]} | Time: {time_str}"
 
-        st.image(frames_rgb[idx], caption=caption, width=640)
-
-    if not any_above:
-        st.warning("No strong matches found. The object may be very small or unclear in the video.")
+        st.image(frame, caption=caption, width=600)
