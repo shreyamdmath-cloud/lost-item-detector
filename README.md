@@ -1,4 +1,4 @@
-Lost Item Detector — AI Vision System
+##Lost Item Detector — AI Vision System
 Hack-A-Day 2025 | Team TRIVYA
 
 Team Members:
