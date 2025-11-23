@@ -1,13 +1,20 @@
-Lost Item Detector — AI Vision System 
+Lost Item Detector — AI Vision System
+Hack-A-Day 2025 | Team TRIVYA
 
-Project: Lost Item Detector — AI Vision System to Find Lost Objects Using CCTV Video
-Team: TRIVYA
-Team members: Bhagyashree D Y, Shreya M D, Sneha M U, Vaishnavi A K
-Event: Hack-A-Day 2025
+Team Members:
 
-This repository contains the working prototype: a Streamlit app that accepts a lost-item image and a CCTV video, scans the video, and returns the top-3 matching frames with bounding boxes and timestamps.
+Bhagyashree D Y
 
-Table of contents
+Shreya M D
+
+Sneha M U
+
+Vaishnavi A K
+
+A complete AI-powered system to detect lost objects in CCTV videos using YOLOv8, ORB feature matching, and CLIP embeddings.
+This repository contains the fully working Streamlit application.
+
+ Table of Contents
 
 Problem Statement
 
@@ -15,7 +22,7 @@ Current Need & Feasibility
 
 Our Solution
 
-How It Works (Workflow)
+How It Works — Workflow
 
 What Makes Us Unique
 
@@ -25,7 +32,7 @@ Tech Stack
 
 System Architecture
 
-What We Built 
+What We Built
 
 Quick Start — Run Locally
 
@@ -33,7 +40,7 @@ Repository Structure
 
 Demo & Expected Inputs
 
-8-Hour Build Plan (summary)
+8-Hour Build Plan (Summary)
 
 Impact & Future Scope
 
@@ -41,122 +48,223 @@ Final Commit Checklist
 
 Contact
 
-Problem statement
+ Problem Statement
 
-Lost items like bags, phones, and laptops occur daily in public spaces. CCTV footage exists but scanning hours of video manually is slow, error-prone, and inefficient. Security staff and users waste time and resources reviewing footage frame by frame. We build an automated AI tool to rapidly find lost objects in CCTV recordings.
+People frequently lose items like bags, wallets, phones, bottles etc.
+CCTV recordings contain evidence, but manually checking hours of footage is slow and inefficient.
 
-Current need & feasibility
+Security teams waste:
 
-User uploads the lost item image.
+Time
 
-User uploads the CCTV video.
+Manpower
 
-Video is automatically converted into frames.
+Resources
 
-YOLOv8 detects objects in each frame.
+Goal: Build an AI system to automatically find the lost item in CCTV video.
 
-ORB extracts feature points from the lost item.
+Current Need & Feasibility
 
-ORB compares those features with detected objects in every frame.
+This solution is practical because:
 
-CLIP embedding is used as a backup similarity check.
+YOLOv8 is lightweight & accurate
 
-System calculates a combined matching score for each frame.
+ORB is fast and CPU-friendly
 
-Top-3 frames with highest similarity scores are displayed with bounding boxes and timestamps.
+CLIP embeddings improve robustness
 
-This is feasible because modern lightweight models (YOLOv8) and CPU-friendly methods (ORB) allow demo-level performance on normal laptops. A pure-software pipeline means no extra hardware is required.
+Entire pipeline runs on any laptop
 
-Our solution 
+ Our Solution
 
-A working Streamlit web app that:
+A working Streamlit app that:
 
-Accepts an uploaded lost-item image and a CCTV video.
+Accepts lost item image
 
-Uses YOLOv8 to detect objects and crop candidate regions.
+Accepts CCTV video
 
-Extracts ORB key-point descriptors from the lost item (fast, classical features).
+Uses YOLOv8 to detect objects
 
-Uses CLIP embeddings as a semantic fallback when ORB is unreliable.
+Extracts ORB keypoints
 
-Samples frames from the video (configurable sampling rate), runs YOLO on frames, and computes combined similarity scores (ORB + CLIP).
+Uses CLIP embedding for semantic fallback
 
-Ranks frames and displays the Top-3 matches with bounding boxes and timestamps.
+Scores similarity
 
-How it works (workflow)
+Shows Top 3 matching frames with bounding boxes & timestamps
 
-User uploads lost-item image.
+ How It Works — Workflow
 
-User uploads CCTV video.
+User uploads lost-item image
 
-Video is converted into frames (sampling every 0.5–1s by default).
+User uploads CCTV video
 
-YOLOv8 detects objects in each frame and crops candidate regions.
+Video → converted into frames
 
-ORB extracts feature points from the lost item crop.
+YOLO detects objects in each frame
 
-ORB compares key-point descriptors between the lost item and each candidate crop.
+ORB extracts features from the lost item
 
-CLIP embeddings are computed as backup and used when ORB scores are low.
+ORB compares features with objects in frames
 
-Combined matching scores are calculated per frame.
+CLIP embedding acts as backup
 
-System shows Top-3 frames with the highest scores (bounding box + timestamp + score).
+Similarity score calculated
 
-What makes us unique
+Top-3 frames are shown
 
-Pure software solution — no special hardware needed.
+ What Makes Us Unique
 
-Works on actual CCTV video (not just single images).
+Hybrid model (YOLO + ORB + CLIP)
 
-Hybrid matching (YOLO + ORB + CLIP) balances speed and robustness.
+Pure software solution
 
-Designed for CPU (laptop) demo at hackathon.
+Works on normal laptop
 
-Simple, professional Streamlit UI for demo and usability.
+Real CCTV video supported
 
-Existing solutions & gaps
+Professional Streamlit UI
 
-What exists: manual CCTV playback, enterprise AI surveillance (costly).
-Gaps: lack of a simple, affordable, local solution that allows object-based searching through video. Our prototype fills this gap.
+Lightweight & hackathon-friendly
 
-Tech stack
+ Existing Solutions & Gaps
 
-Python (core language)
+Existing: Manual CCTV review, expensive enterprise surveillance tools
+Gaps:
 
-Ultralytics YOLOv8 (yolov8s / yolov8n as appropriate) — object detection
+No simple & affordable local system
 
-OpenCV — video processing, frame extraction, image ops
+No object-based search
 
-ORB — real-time keypoint descriptor & matching (CPU friendly)
+No open-source version
 
-CLIP (or a CLIP-like embedding extractor) — semantic image embedding fallback
+Our prototype fills the gap.
 
-NumPy — numerical ops & similarity calculations
+ Tech Stack
 
-Streamlit — frontend demo app
+Python
 
-System architecture
+Ultralytics YOLOv8
 
-User Input → YOLO Detection → ORB + CLIP Feature Extraction → Video Frame Extraction → YOLO on Frames → ORB & CLIP Similarity → Ranking → Top-3 Results
+OpenCV
 
-(Include diagram in PPT — use the provided Canva/PowerPoint prompt to generate a clean block diagram.)
+ORB keypoint extraction
 
-What we built 
+CLIP embedding
+
+NumPy
+
+Streamlit
+ System Architecture
+User Input (Image + Video)
+        ↓
+YOLO Detection (Lost Item)
+        ↓
+ORB + CLIP Feature Extraction
+        ↓
+Video Frame Extraction
+        ↓
+YOLO on Frames
+        ↓
+ORB & CLIP Similarity
+        ↓
+Ranking Algorithm
+        ↓
+Top-3 Results (Frames + Boxes + Timestamps)
+
+What We Built
+
 Video upload module
 
 Lost item upload module
 
-YOLO detection & object cropping in the uploaded image
+YOLO detection on uploaded image
 
-ORB feature extraction for the lost item
+ORB feature extraction
 
-CLIP embedding fallback for semantic similarity
+CLIP embedding fallback
 
-Video frame sampling & YOLO detection on frames
+Frame sampler
 
-ORB matching and CLIP fallback scoring per frame
+Matching engine
 
-Ranking to get top 3 frames with bounding boxes and timestamps
+Ranking logic
 
-Premium Streamlit UI (gradient + banner + Start Search button)
+Top-3 results display
+
+Premium dark UI
+
+⚙️ Quick Start — Run Locally
+pip install -r requirements.txt
+streamlit run app.py
+
+ Repository Structure
+ lost-item-detector
+│── app.py
+│── requirements.txt
+│── model/
+│   └── yolov8s.pt
+│── utils/
+│   ├── feature_extract.py
+│   └── similarity.py
+│── uploads/
+│── README.md
+
+Demo & Expected Inputs
+
+Lost item:
+
+Clear, close-up photo
+
+JPG/PNG
+
+CCTV video:
+
+MP4/MOV/AVI
+
+10–60 seconds recommended
+
+Good lighting improves results
+
+ 8-Hour Build Plan (Summary)
+Hour	Task
+1	Problem understanding + architecture
+2	YOLO integration
+3	ORB matching
+4	Frame extraction
+5	CLIP fallback
+6	Scoring system
+7	Streamlit UI
+8	Testing + PPT + GitHub
+ Impact & Future Scope
+
+Multi-camera lost-item tracking
+
+Real-time CCTV support
+
+Improved accuracy via fine-tuned models
+
+Mobile app version
+
+Alert/notification system
+
+ Final Commit Checklist
+
+ Code pushed
+
+ README added
+
+ Streamlit UI working
+
+ Video upload tested
+
+ YOLO model included
+
+ Documentation prepared
+
+ Final PPT ready
+
+ Contact
+
+Team TRIVYA – Hack-A-Day 2025
+For queries, connect during event hours.
